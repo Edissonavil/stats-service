@@ -8,18 +8,24 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     @Value("${jwt.secret}")
@@ -28,15 +34,21 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http,
                                                    JwtAuthenticationConverter jwtAuthConverter) throws Exception {
+
         http
-          .csrf().disable()
+          .csrf(csrf -> csrf.disable())
+          .cors(cors -> cors.configurationSource(corsConfigurationSource()))
           .authorizeHttpRequests(auth -> auth
-              // colaborador solo a creator
-              .requestMatchers("/api/stats/creator/**")
-                .hasAuthority("ROL_COLABORADOR")
-              // admin solo a cualquier /admin/*
-              .requestMatchers("/api/stats/admin/**")
-                .hasAuthority("ROL_ADMIN")
+              // Permite acceso sin autenticación a Swagger UI y health check
+              .requestMatchers("/api/stats/health", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+              
+              // Define las reglas de autorización basadas en roles/autoridades
+              // *** CAMBIO CLAVE AQUÍ: Usar hasAuthority("ROL_ADMIN") ***
+              .requestMatchers("/api/stats/admin/**").hasAuthority("ROL_ADMIN") 
+              // Mantener hasAnyAuthority para colaborador, ya es correcto
+              .requestMatchers("/api/stats/collaborator/**").hasAnyAuthority("ROL_COLABORADOR", "ROL_ADMIN")
+              
+              // Cualquier otra solicitud requiere autenticación
               .anyRequest().authenticated()
           )
           .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -46,26 +58,43 @@ public class SecurityConfig {
                   .jwtAuthenticationConverter(jwtAuthConverter)
               )
           );
+
         return http.build();
     }
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        byte[] key = Base64.getDecoder().decode(jwtSecret);
+        byte[] keyBytes = Base64.getDecoder().decode(jwtSecret);
         return NimbusJwtDecoder
-                 .withSecretKey(new SecretKeySpec(key, "HmacSHA256"))
+                 .withSecretKey(new SecretKeySpec(keyBytes,"HmacSHA256"))
                  .build();
     }
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtGrantedAuthoritiesConverter delegate = new JwtGrantedAuthoritiesConverter();
-        delegate.setAuthoritiesClaimName("role");
-        delegate.setAuthorityPrefix("");
+        delegate.setAuthoritiesClaimName("role"); // El nombre del claim en tu JWT que contiene el/los rol/es
+        delegate.setAuthorityPrefix(""); // No añadas prefijo "SCOPE_" o "ROLE_" si tu claim ya tiene "ROL_"
 
         JwtAuthenticationConverter conv = new JwtAuthenticationConverter();
-        conv.setJwtGrantedAuthoritiesConverter(delegate);
+        conv.setJwtGrantedAuthoritiesConverter(jwt -> 
+              delegate.convert(jwt).stream()
+                      .map(a -> new SimpleGrantedAuthority(a.getAuthority()))
+                      .collect(Collectors.toList())
+        );
         return conv;
     }
-}
 
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+}

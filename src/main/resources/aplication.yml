@@ -1,34 +1,27 @@
+server:
+  port: ${SERVER_PORT:8086} # Puerto por defecto para desarrollo, Railway usará su propio puerto
+  servlet:
+    context-path: /stats-service
+
 spring:
   application:
-    name: aec-stats
+    name: stats-service
+
+  # Configuración de la base de datos
   datasource:
-    url:      ${DATASOURCE_URL:jdbc:postgresql://localhost:5432/aec}
-    username: ${DATASOURCE_USER:aec}
-    password: ${DATASOURCE_PASS:2412}
+    url: ${DATASOURCE_URL} # ¡SIN valor por defecto para seguridad!
+    username: ${DATASOURCE_USER} # ¡SIN valor por defecto para seguridad!
+    password: ${DATASOURCE_PASS} # ¡SIN valor por defecto para seguridad!
+    driver-class-name: org.postgresql.Driver # Mantener explícito, aunque Spring Boot a menudo lo deduce
+
   jpa:
     hibernate:
-      ddl-auto: ${DDL_AUTO:update}
-
-server:
-  port: ${SERVER_PORT:8086}
-
-jwt:
-  secret:    ${JWT_SECRET:Cuetm0BgR8Bjk8Mo2OXtOlOxkc/N1K2g3vKx82o8Lcw=}
-  accessMs:  ${JWT_ACCESS_MS:3600000}
-  refreshMs: ${JWT_REFRESH_MS:86400000}
-
-external:
-  users-service:    ${USERS_SVC_URL:http://localhost:8081}
-  file-service:     ${FILE_SVC_URL:http://localhost:8084}
-  product-service:  ${PRODUCT_SVC_URL:http://localhost:8083}
-  orders-service:   ${ORDERS_SVC_URL:http://localhost:8085}
-
-file:
-  upload-dir: ${UPLOAD_DIR:/home/tesis/aec/file-service/uploads}
-
-logging:
-  level:
-    org.springframework.web.servlet.DispatcherServlet: DEBUG
-    org.springframework.web.method.support.HandlerMethodArgumentResolver: DEBUG
-    com.aec.statssrv.client.OrderClient: DEBUG
-    feign.Logger: DEBUG
+      ddl-auto: ${DDL_AUTO:validate} # 'validate' es ideal para producción, 'update' para desarrollo.
+                                      # Aquí lo hacemos configurable por variable de entorno.
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+    show-sql: false # Generalmente false en producción para rendimiento y seguridad del log
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true # Útil para depuración si show-sql es true, o para logs
