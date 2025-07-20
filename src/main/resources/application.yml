@@ -20,16 +20,16 @@ spring:
     default-encoding: UTF-8
 
   datasource:
-    url: jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
-    username: ${PGUSER}
-    password: ${PGPASSWORD}
+    url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:railway}
+    username: ${PGUSER:postgres}
+    password: ${PGPASSWORD:postgres}
+
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: ${DDL_AUTO:update}
     show-sql: true
-    database-platform: org.hibernate.dialect.PostgreSQLDialect 
     properties:
       hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect 
 
