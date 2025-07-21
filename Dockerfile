@@ -1,24 +1,20 @@
-# syntax=docker/dockerfile:1.4
-
-###########################
-# 🔨 Build stage (Debian) #
-###########################
 FROM maven:3.9.7-eclipse-temurin-21 AS build
 WORKDIR /app
 
-# 1️⃣ Pre-cache dependencias
+# 1️⃣ Pre-cache dependencias de Maven
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2 mvn -B dependency:go-offline
 
 # 2️⃣ Copiamos solo el código fuente
 COPY src ./src
-# 3️⃣ Construimos el jar sin tests
+
+# 3️⃣ Construimos el JAR sin tests y cacheamos deps
 RUN --mount=type=cache,target=/root/.m2 mvn -B package -DskipTests
 
 ############################
 # 🚀 Runtime stage (Alpine) #
 ############################
-FROM eclipse-temurin:21-jre-alpine        
+FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 # 4️⃣ curl para health-check
