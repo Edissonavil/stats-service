@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.4
+
 ###########################
 # 🔨 Build stage (Debian) #
 ###########################
@@ -6,26 +8,28 @@ WORKDIR /app
 
 # 1️⃣ Pre-cache dependencias
 COPY pom.xml .
-RUN mvn -B dependency:go-offline
+RUN --mount=type=cache,target=/root/.m2 mvn -B dependency:go-offline
 
-# 2️⃣ Copiamos SOLO el código del micro-servicio
-COPY src src
-RUN mvn -B package -DskipTests            
+# 2️⃣ Copiamos solo el código fuente
+COPY src ./src
+# 3️⃣ Construimos el jar sin tests
+RUN --mount=type=cache,target=/root/.m2 mvn -B package -DskipTests
+
 ############################
 # 🚀 Runtime stage (Alpine) #
 ############################
 FROM eclipse-temurin:21-jre-alpine        
 WORKDIR /app
 
-# 3️⃣ curl para health-check (solo runtime)
+# 4️⃣ curl para health-check
 RUN apk add --no-cache curl
 
-# 4️⃣ Copiamos el JAR generado
+# 5️⃣ Copiamos el JAR generado
 COPY --from=build /app/target/*stats*.jar app.jar
 
 EXPOSE 8080
 
-# 5️⃣ Health-check interno del contenedor
+# 6️⃣ Health-check interno
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
