@@ -48,7 +48,7 @@ docker:
 
 logging:
   level:
-    logging.level.root=DEBUG
-    logging.level.org.springframework=DEBUG
-    logging.level.com.tuaplicacion=DEBUG 
+    root: DEBUG
+    org.springframework: DEBUG
+    com.tuaplicacion: DEBUG 
 
