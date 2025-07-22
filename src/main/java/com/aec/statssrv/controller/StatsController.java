@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/stats")
+@RequestMapping("/stats")
 @Tag(name = "Estadísticas", description = "API para consultar estadísticas de ventas")
 @SecurityRequirement(name = "Bearer Authentication")
 public class StatsController {
