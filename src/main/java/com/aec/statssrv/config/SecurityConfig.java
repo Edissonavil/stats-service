@@ -19,7 +19,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.spec.SecretKeySpec;
-import java.util.Arrays;
+
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -59,7 +59,6 @@ public class SecurityConfig {
               .requestMatchers("/api/stats/health", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
               
               // Define las reglas de autorización basadas en roles/autoridades
-              // *** CAMBIO CLAVE AQUÍ: Usar hasAuthority("ROL_ADMIN") ***
               .requestMatchers("/api/stats/admin/**").hasAuthority("ROL_ADMIN") 
               // Mantener hasAnyAuthority para colaborador, ya es correcto
               .requestMatchers("/api/stats/collaborator/**").hasAnyAuthority("ROL_COLABORADOR", "ROL_ADMIN")

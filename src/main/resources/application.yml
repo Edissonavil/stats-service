@@ -45,3 +45,4 @@ admin:
 docker:
   compose:
     enabled: false
+
