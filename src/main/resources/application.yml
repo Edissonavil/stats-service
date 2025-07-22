@@ -46,3 +46,9 @@ docker:
   compose:
     enabled: false
 
+logging:
+  level:
+    root: DEBUG
+    org.springframework: DEBUG
+    com.tuaplicacion: DEBUG 
+
