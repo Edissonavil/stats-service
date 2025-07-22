@@ -21,7 +21,6 @@ import java.util.List;
 @RequestMapping("/api/stats")
 @Tag(name = "Estadísticas", description = "API para consultar estadísticas de ventas")
 @SecurityRequirement(name = "Bearer Authentication")
-@CrossOrigin(origins = "http://localhost:3000")
 public class StatsController {
     
     @Autowired
