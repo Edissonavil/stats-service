@@ -1,10 +1,6 @@
 server:
   port: ${PORT:8080}
 
-
-  servlet:
-    context-path: /stats-service
-
 spring:
   application:
     name: stats-service
