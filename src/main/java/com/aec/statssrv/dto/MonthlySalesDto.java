@@ -9,18 +9,19 @@ public class MonthlySalesDto {
     private String month;
     private BigDecimal revenue;
 
-    // === Nuevo constructor para JPQL ===
+     /** Hibernate necesita esta firma exacta (int, BigDecimal) */
     public MonthlySalesDto(int monthNumber, BigDecimal revenue) {
-        this.month = Month.of(monthNumber)
-                .getDisplayName(TextStyle.SHORT, Locale.getDefault());
+        this.month   = Month.of(monthNumber)
+                            .getDisplayName(TextStyle.SHORT, Locale.getDefault());
         this.revenue = (revenue != null) ? revenue : BigDecimal.ZERO;
     }
 
-    // Constructor para SQL nativo (sin cambios)
+    // (Opcional) el que usas para SQL nativo o string-based:
     public MonthlySalesDto(String month, BigDecimal revenue) {
-        this.month = month;
-        this.revenue = revenue;
+        this.month   = month;
+        this.revenue = (revenue != null) ? revenue : BigDecimal.ZERO;
     }
+    
 
     // Getters y Setters
     public String getMonth() {
