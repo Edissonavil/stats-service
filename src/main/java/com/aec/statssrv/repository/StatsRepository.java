@@ -195,16 +195,17 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
     Long countTotalProducts();
 
     // Ventas mensuales para el gráfico de línea (JPQL - solo Order)
-    @Query(value = "SELECT new com.aec.statssrv.dto.MonthlySalesDto(FUNCTION('MONTH', o.creadoEn), COALESCE(SUM(o.total), 0)) " +
-            "FROM Order o " +
-            "WHERE o.status = 'COMPLETED' " +
-            "AND FUNCTION('YEAR', o.creadoEn) = :year " +
-            "GROUP BY FUNCTION('MONTH', o.creadoEn) " +
-            "ORDER BY FUNCTION('MONTH', o.creadoEn)",
-           countQuery = "SELECT COUNT(DISTINCT FUNCTION('MONTH', o.creadoEn)) " + // CONTEO EXPLÍCITO
-                        "FROM Order o " +
-                        "WHERE o.status = 'COMPLETED' " +
-                        "AND FUNCTION('YEAR', o.creadoEn) = :year")
+     @Query(
+      "SELECT new com.aec.statssrv.dto.MonthlySalesDto(" +
+      "  FUNCTION('MONTH', o.creadoEn), " +
+      "  SUM(o.total)" +
+      ") " +
+      "FROM Order o " +
+      "WHERE o.status = 'COMPLETED' " +
+      "  AND FUNCTION('YEAR', o.creadoEn) = :year " +
+      "GROUP BY FUNCTION('MONTH', o.creadoEn) " +
+      "ORDER BY FUNCTION('MONTH', o.creadoEn)"
+    )
     List<MonthlySalesDto> getMonthlySales(@Param("year") Integer year);
 
     // Obtener ingresos de un mes específico para el cálculo de crecimiento (JPQL - solo Order)
