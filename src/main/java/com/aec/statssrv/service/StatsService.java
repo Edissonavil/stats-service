@@ -4,7 +4,6 @@ package com.aec.statssrv.service;
 import com.aec.statssrv.dto.*;
 import com.aec.statssrv.exception.CollaboratorNotFoundException;
 import com.aec.statssrv.repository.StatsRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -16,179 +15,190 @@ import java.util.List;
 @Service
 public class StatsService {
 
-    @Autowired
-    private StatsRepository statsRepository;
+    private final StatsRepository statsRepository;
+
+    public StatsService(StatsRepository statsRepository) {
+        this.statsRepository = statsRepository;
+    }
+
+    /* -------------------------------------------------------------------- */
+    /* ======================  PANEL ADMIN GENERAL  ======================= */
+    /* -------------------------------------------------------------------- */
 
     public SalesStatsDto getAdminStats(StatsFilterDto filter) {
-        LocalDateTime[] dateRange = getDateRange(filter);
-        LocalDateTime startDate = dateRange[0];
-        LocalDateTime endDate = dateRange[1];
 
-        // Estadísticas generales del período filtrado
-        BigDecimal totalRevenue = statsRepository.getTotalRevenue(startDate, endDate);
-        Long totalOrders = statsRepository.getTotalCompletedOrders(startDate, endDate);
-        Long totalProductsSold = statsRepository.getTotalProductsSold(startDate, endDate);
+        /* rango principal según el filtro                (>= start  &&  < end) */
+        LocalDateTime[] range       = resolveRange(filter);
+        LocalDateTime    start      = range[0];
+        LocalDateTime    end        = range[1];
+
+        /* métricas globales */
+        BigDecimal totalRevenue     = statsRepository.getTotalRevenue(start, end);
+        long       totalOrders      = statsRepository.getTotalCompletedOrders(start, end);
+        long       totalProdSold    = statsRepository.getTotalProductsSold(start, end);
 
         SalesStatsDto stats = new SalesStatsDto(
                 totalRevenue,
-                totalOrders.intValue(),
-                totalProductsSold.intValue());
+                (int) totalOrders,
+                (int) totalProdSold);
 
-        // --- Nuevas métricas para el Panel de Administrador (datos globales o del
-        // sistema) ---
-        // Ahora solo el total de colaboradores por rol
+        /* dashboard extra  */
         stats.setTotalCollaborators(statsRepository.countTotalCollaborators());
-        stats.setTotalCustomers(statsRepository.countTotalCustomers());
+        stats.setTotalCustomers    (statsRepository.countTotalCustomers());
         stats.setProductsPendingReview(statsRepository.countProductsPendingReview());
-        stats.setPaymentsToVerify(statsRepository.countPaymentsToVerify());
-        stats.setPaymentErrors(statsRepository.countPaymentErrors());
-        stats.setTotalProductsCount(statsRepository.countTotalProducts());
+        stats.setPaymentsToVerify     (statsRepository.countPaymentsToVerify());
+        stats.setPaymentErrors        (statsRepository.countPaymentErrors());
+        stats.setTotalProductsCount   (statsRepository.countTotalProducts());
 
-        // Cálculo del crecimiento mensual
-        double monthlyGrowth = calculateMonthlyGrowth(filter.getYear(), filter.getMonth());
-        stats.setMonthlyGrowthPercentage(monthlyGrowth);
+        /* crecimiento inter-mensual  */
+        stats.setMonthlyGrowthPercentage(
+                calcGrowthPercentage(filter.getYear(), filter.getMonth())
+        );
 
-        // Top productos vendidos (últimos 30 días - sin importar el filtro de año/mes)
-        LocalDateTime last30DaysStart = LocalDateTime.now().minusDays(30);
+        /* top productos últimos 30 d */
         LocalDateTime now = LocalDateTime.now();
-        stats.setTopProductsLast30Days(statsRepository.getTopProductsLast30Days(last30DaysStart, now));
+        stats.setTopProductsLast30Days(
+                statsRepository.getTopProductsLast30Days(now.minusDays(30), now)
+        );
 
-        // Ventas por colaborador (para el período filtrado)
-        List<CollaboratorSalesDto> collaboratorSales = statsRepository.getCollaboratorSales(startDate, endDate);
-        stats.setCollaboratorSales(collaboratorSales);
+        /* ventas por colaborador / producto / método de pago */
+        stats.setCollaboratorSales(statsRepository.getCollaboratorSales(start, end));
+        stats.setProductSales      (statsRepository.getProductSales(start, end, null));
 
-        // Ventas por producto (para el período filtrado)
-        List<ProductSalesDto> productSales = statsRepository.getProductSales(startDate, endDate, null);
-        stats.setProductSales(productSales);
+        List<PaymentMethodStatsDto> pm =
+                statsRepository.getPaymentMethodStats(start, end, null);
+        setPaymentPercentages(pm, totalRevenue);
+        stats.setPaymentMethods(pm);
 
-        // Estadísticas por método de pago (para el período filtrado)
-        List<PaymentMethodStatsDto> paymentMethods = statsRepository.getPaymentMethodStats(startDate, endDate, null);
-        calculatePaymentPercentages(paymentMethods, totalRevenue);
-        stats.setPaymentMethods(paymentMethods);
-
-        // Ventas mensuales para el gráfico de línea (siempre para el año completo del
-        // filtro)
-        List<MonthlySalesDto> monthlySales = statsRepository.getMonthlySales(filter.getYear());
-        stats.setMonthlySales(monthlySales);
+        /* ventas mensuales del año completo del filtro             */
+        LocalDateTime yearStart = startOfYear(filter.getYear());
+        LocalDateTime yearEnd   = yearStart.plusYears(1);
+        stats.setMonthlySales(
+                statsRepository.getMonthlySales(yearStart, yearEnd)
+        );
 
         return stats;
     }
 
-    /**
-     * Obtiene estadísticas para un colaborador específico
-     */
-    public SalesStatsDto getCollaboratorStats(String collaboratorUsername, StatsFilterDto filter) {
-        if (!statsRepository.existsCollaboratorByUsername(collaboratorUsername)) {
-            throw new CollaboratorNotFoundException("Colaborador no encontrado: " + collaboratorUsername);
+    /* -------------------------------------------------------------------- */
+    /* ================  PANEL PARA COLABORADOR ESPECÍFICO  ================ */
+    /* -------------------------------------------------------------------- */
+
+    public SalesStatsDto getCollaboratorStats(String username, StatsFilterDto filter) {
+
+        if (!statsRepository.existsCollaboratorByUsername(username)) {
+            throw new CollaboratorNotFoundException("Colaborador no encontrado: " + username);
         }
 
-        LocalDateTime[] dateRange = getDateRange(filter);
-        LocalDateTime startDate = dateRange[0];
-        LocalDateTime endDate = dateRange[1];
+        LocalDateTime[] range    = resolveRange(filter);
+        LocalDateTime    start   = range[0];
+        LocalDateTime    end     = range[1];
 
-        BigDecimal totalRevenue = statsRepository.getCollaboratorTotalRevenue(collaboratorUsername, startDate, endDate);
-        Long totalOrders = statsRepository.getCollaboratorTotalOrders(collaboratorUsername, startDate, endDate);
-        Long totalProducts = statsRepository.getCollaboratorTotalProductsSold(collaboratorUsername, startDate, endDate);
+        BigDecimal revenue       = statsRepository.getCollaboratorTotalRevenue(username, start, end);
+        long       orders        = statsRepository.getCollaboratorTotalOrders(username, start, end);
+        long       productsSold  = statsRepository.getCollaboratorTotalProductsSold(username, start, end);
 
-        SalesStatsDto stats = new SalesStatsDto(
-                totalRevenue,
-                totalOrders.intValue(),
-                totalProducts.intValue());
+        SalesStatsDto stats = new SalesStatsDto(revenue, (int) orders, (int) productsSold);
 
-        List<ProductSalesDto> productSales = statsRepository.getProductSales(startDate, endDate, collaboratorUsername);
-        stats.setProductSales(productSales);
+        stats.setProductSales(
+                statsRepository.getProductSales(start, end, username)
+        );
 
-        List<PaymentMethodStatsDto> paymentMethods = statsRepository.getPaymentMethodStats(startDate, endDate,
-                collaboratorUsername);
-        calculatePaymentPercentages(paymentMethods, totalRevenue);
-        stats.setPaymentMethods(paymentMethods);
+        List<PaymentMethodStatsDto> pm =
+                statsRepository.getPaymentMethodStats(start, end, username);
+        setPaymentPercentages(pm, revenue);
+        stats.setPaymentMethods(pm);
 
-        List<MonthlySalesDto> monthlySales = statsRepository.getMonthlySalesByCollaborator(collaboratorUsername,
-                filter.getYear());
-        stats.setMonthlySales(monthlySales);
+        /* serie mensual (año completo del filtro) */
+        LocalDateTime yearStart = startOfYear(filter.getYear());
+        LocalDateTime yearEnd   = yearStart.plusYears(1);
+        stats.setMonthlySales(
+                statsRepository.getMonthlySalesByCollaborator(username, yearStart, yearEnd)
+        );
 
         return stats;
     }
+
+    /* -------------------------------------------------------------------- */
+    /* ======================  ENDPOINTS AUXILIARES  ====================== */
+    /* -------------------------------------------------------------------- */
 
     public List<CollaboratorSalesDto> getCollaboratorSalesOnly(StatsFilterDto filter) {
-        LocalDateTime[] dateRange = getDateRange(filter);
-        return statsRepository.getCollaboratorSales(dateRange[0], dateRange[1]);
+        LocalDateTime[] r = resolveRange(filter);
+        return statsRepository.getCollaboratorSales(r[0], r[1]);
     }
 
-    public List<ProductSalesDto> getProductSalesOnly(StatsFilterDto filter, String collaboratorUsername) {
-        LocalDateTime[] dateRange = getDateRange(filter);
-        return statsRepository.getProductSales(dateRange[0], dateRange[1], collaboratorUsername);
-    }
-
-    private LocalDateTime[] getDateRange(StatsFilterDto filter) {
-        LocalDateTime startDate;
-        LocalDateTime endDate;
-
-        if (filter.getMonth() != null) {
-            YearMonth yearMonth = YearMonth.of(filter.getYear(), filter.getMonth());
-            startDate = yearMonth.atDay(1).atStartOfDay();
-            endDate = yearMonth.atEndOfMonth().atTime(23, 59, 59);
-        } else {
-            startDate = LocalDateTime.of(filter.getYear(), 1, 1, 0, 0, 0);
-            endDate = LocalDateTime.of(filter.getYear(), 12, 31, 23, 59, 59);
-        }
-
-        return new LocalDateTime[] { startDate, endDate };
-    }
-
-    private void calculatePaymentPercentages(List<PaymentMethodStatsDto> paymentMethods, BigDecimal totalRevenue) {
-        if (totalRevenue.compareTo(BigDecimal.ZERO) > 0) {
-            paymentMethods.forEach(pm -> {
-                BigDecimal percentage = pm.getTotalAmount()
-                        .divide(totalRevenue, 4, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(100));
-                pm.setPercentage(percentage.doubleValue());
-            });
-        }
-    }
-
-    private double calculateMonthlyGrowth(Integer year, Integer currentMonthFilter) {
-        BigDecimal currentPeriodRevenue;
-        BigDecimal previousPeriodRevenue;
-
-        if (currentMonthFilter != null) {
-            currentPeriodRevenue = statsRepository.getMonthlyRevenue(year, currentMonthFilter);
-
-            Integer prevMonthNum = currentMonthFilter - 1;
-            Integer prevYearNum = year;
-            if (prevMonthNum == 0) {
-                prevMonthNum = 12;
-                prevYearNum = year - 1;
-            }
-            previousPeriodRevenue = statsRepository.getMonthlyRevenue(prevYearNum, prevMonthNum);
-
-        } else {
-            // Si no se filtra por mes, tomamos el mes actual para el cálculo de crecimiento
-            int currentMonth = LocalDateTime.now().getMonthValue();
-            currentPeriodRevenue = statsRepository.getMonthlyRevenue(year, currentMonth);
-
-            int prevMonth = currentMonth - 1;
-            int prevYear = year;
-            if (prevMonth == 0) {
-                prevMonth = 12;
-                prevYear = year - 1;
-            }
-            previousPeriodRevenue = statsRepository.getMonthlyRevenue(prevYear, prevMonth);
-        }
-
-        if (previousPeriodRevenue != null && previousPeriodRevenue.compareTo(BigDecimal.ZERO) > 0) {
-            return currentPeriodRevenue.subtract(previousPeriodRevenue)
-                    .divide(previousPeriodRevenue, 4, RoundingMode.HALF_UP)
-                    .multiply(BigDecimal.valueOf(100))
-                    .doubleValue();
-        }
-        return 0.0;
+    public List<ProductSalesDto> getProductSalesOnly(StatsFilterDto filter, String uploader) {
+        LocalDateTime[] r = resolveRange(filter);
+        return statsRepository.getProductSales(r[0], r[1], uploader);
     }
 
     public boolean collaboratorExists(String username) {
         return statsRepository.existsCollaboratorByUsername(username);
     }
 
-}
+    /* -------------------------------------------------------------------- */
+    /* =========================  MÉTODOS PRIVADOS  ======================== */
+    /* -------------------------------------------------------------------- */
 
-   
+    /** Devuelve un rango [start, end) acorde al filtro */
+    private LocalDateTime[] resolveRange(StatsFilterDto filter) {
+
+        if (filter.getMonth() != null) {               // rango de un mes concreto
+            YearMonth ym   = YearMonth.of(filter.getYear(), filter.getMonth());
+            LocalDateTime start = ym.atDay(1).atStartOfDay();
+            LocalDateTime end   = start.plusMonths(1); // exclusivo
+            return new LocalDateTime[]{start, end};
+
+        } else {                                       // rango del año completo
+            LocalDateTime start = startOfYear(filter.getYear());
+            return new LocalDateTime[]{start, start.plusYears(1)};
+        }
+    }
+
+    private LocalDateTime startOfYear(int year) {
+        return LocalDateTime.of(year, 1, 1, 0, 0);
+    }
+
+    /** Calcula % crecimiento entre mes actual y mes anterior. */
+    private double calcGrowthPercentage(int year, Integer monthFilter) {
+
+        /* Si el filtro tiene mes usamos ese; si no, usamos el mes actual */
+        int currMonth = (monthFilter != null) ? monthFilter : LocalDateTime.now().getMonthValue();
+        int currYear  = year;
+
+        int prevMonth = currMonth - 1;
+        int prevYear  = currYear;
+        if (prevMonth == 0) { prevMonth = 12; prevYear--; }
+
+        BigDecimal curr = revenueForMonth(currYear,  currMonth);
+        BigDecimal prev = revenueForMonth(prevYear,  prevMonth);
+
+        if (prev.compareTo(BigDecimal.ZERO) > 0) {
+            return curr.subtract(prev)
+                       .divide(prev, 4, RoundingMode.HALF_UP)
+                       .multiply(BigDecimal.valueOf(100))
+                       .doubleValue();
+        }
+        return 0.0;
+    }
+
+    /** Suma de ingresos de un mes (usa rango de fechas, no funciones SQL). */
+    private BigDecimal revenueForMonth(int year, int month) {
+        LocalDateTime start = LocalDateTime.of(year, month, 1, 0, 0);
+        LocalDateTime end   = start.plusMonths(1);
+        return statsRepository.getTotalRevenue(start, end);
+    }
+
+    /** Completa el % del total para cada método de pago */
+    private void setPaymentPercentages(List<PaymentMethodStatsDto> list, BigDecimal total) {
+        if (total.compareTo(BigDecimal.ZERO) == 0) return;
+
+        list.forEach(pm -> {
+            BigDecimal pct = pm.getTotalAmount()
+                               .divide(total, 4, RoundingMode.HALF_UP)
+                               .multiply(BigDecimal.valueOf(100));
+            pm.setPercentage(pct.doubleValue());
+        });
+    }
+}
