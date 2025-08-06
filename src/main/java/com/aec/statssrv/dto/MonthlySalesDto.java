@@ -9,14 +9,17 @@ public class MonthlySalesDto {
     private String month;
     private BigDecimal revenue;
 
-     /** Hibernate necesita esta firma exacta (int, BigDecimal) */
-    public MonthlySalesDto(int monthNumber, BigDecimal revenue) {
+    public MonthlySalesDto(int monthNumber, Number revenue) {
         this.month   = Month.of(monthNumber)
                             .getDisplayName(TextStyle.SHORT, Locale.getDefault());
-        this.revenue = (revenue != null) ? revenue : BigDecimal.ZERO;
+        this.revenue = (revenue == null)
+                       ? BigDecimal.ZERO
+                       : (revenue instanceof BigDecimal
+                          ? (BigDecimal) revenue
+                          : BigDecimal.valueOf(revenue.doubleValue()));
     }
 
-    // (Opcional) el que usas para SQL nativo o string-based:
+    // El constructor String+BigDecimal para tu SQL nativo
     public MonthlySalesDto(String month, BigDecimal revenue) {
         this.month   = month;
         this.revenue = (revenue != null) ? revenue : BigDecimal.ZERO;
