@@ -6,9 +6,8 @@ import com.aec.statssrv.dto.MonthlySalesDto;
 import com.aec.statssrv.dto.PaymentMethodStatsDto;
 import com.aec.statssrv.dto.ProductSalesDto;
 import com.aec.statssrv.model.Order;
-import com.aec.statssrv.model.Product; // Product SÍ está mapeado en este microservicio
-import com.aec.statssrv.model.OrderItem; // OrderItem SÍ está mapeado en este microservicio
-// User NO está mapeado, por lo que no se importa la entidad User aquí.
+import com.aec.statssrv.model.Product; 
+import com.aec.statssrv.model.OrderItem; 
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -47,7 +46,7 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
                               @Param("endDate") LocalDateTime endDate);
 
     // Ventas por colaborador (JPQL - OrderItem y Product)
-    @Query("SELECT new com.aec.statssrv.dto.CollaboratorSalesDto(" +
+    @Query(value = "SELECT new com.aec.statssrv.dto.CollaboratorSalesDto(" +
             "p.uploaderUsername, " +
             "COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0), " +
             "COALESCE(SUM(oi.cantidad), 0), " +
@@ -55,17 +54,24 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
             "p.pais) " +
             "FROM OrderItem oi " +
             "JOIN oi.order o " +
-            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
+            "JOIN oi.product p " +
             "WHERE o.status = 'COMPLETED' " +
             "AND o.creadoEn >= :startDate " +
             "AND o.creadoEn <= :endDate " +
             "GROUP BY p.uploaderUsername, p.pais " +
-            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC")
+            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC",
+           countQuery = "SELECT COUNT(DISTINCT p.uploaderUsername, p.pais) " + // CONTEO EXPLÍCITO
+                        "FROM OrderItem oi " +
+                        "JOIN oi.order o " +
+                        "JOIN oi.product p " +
+                        "WHERE o.status = 'COMPLETED' " +
+                        "AND o.creadoEn >= :startDate " +
+                        "AND o.creadoEn <= :endDate")
     List<CollaboratorSalesDto> getCollaboratorSales(@Param("startDate") LocalDateTime startDate,
                                                     @Param("endDate") LocalDateTime endDate);
 
     // Ventas por producto (JPQL - OrderItem y Product)
-    @Query("SELECT new com.aec.statssrv.dto.ProductSalesDto(" +
+    @Query(value = "SELECT new com.aec.statssrv.dto.ProductSalesDto(" +
             "p.idProducto, " +
             "p.nombre, " +
             "p.uploaderUsername, " +
@@ -76,31 +82,47 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
             "p.pais) " +
             "FROM OrderItem oi " +
             "JOIN oi.order o " +
-            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
+            "JOIN oi.product p " +
             "WHERE o.status = 'COMPLETED' " +
             "AND o.creadoEn >= :startDate " +
             "AND o.creadoEn <= :endDate " +
             "AND (:uploaderUsername IS NULL OR p.uploaderUsername = :uploaderUsername) " +
             "GROUP BY p.idProducto, p.nombre, p.uploaderUsername, p.precioIndividual, p.pais " +
-            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC")
+            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC",
+           countQuery = "SELECT COUNT(DISTINCT p.idProducto) " + // CONTEO EXPLÍCITO
+                        "FROM OrderItem oi " +
+                        "JOIN oi.order o " +
+                        "JOIN oi.product p " +
+                        "WHERE o.status = 'COMPLETED' " +
+                        "AND o.creadoEn >= :startDate " +
+                        "AND o.creadoEn <= :endDate " +
+                        "AND (:uploaderUsername IS NULL OR p.uploaderUsername = :uploaderUsername)")
     List<ProductSalesDto> getProductSales(@Param("startDate") LocalDateTime startDate,
                                           @Param("endDate") LocalDateTime endDate,
                                           @Param("uploaderUsername") String uploaderUsername);
 
     // Estadísticas por método de pago (JPQL - OrderItem y Product)
-    @Query("SELECT new com.aec.statssrv.dto.PaymentMethodStatsDto(" +
+    @Query(value = "SELECT new com.aec.statssrv.dto.PaymentMethodStatsDto(" +
             "COALESCE(o.paymentMethod, 'NO_ESPECIFICADO'), " +
             "COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0), " +
             "COUNT(DISTINCT o.id)) " +
             "FROM OrderItem oi " +
             "JOIN oi.order o " +
-            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
+            "JOIN oi.product p " +
             "WHERE o.status = 'COMPLETED' " +
             "AND o.creadoEn >= :startDate " +
             "AND o.creadoEn <= :endDate " +
             "AND (:uploaderUsername IS NULL OR p.uploaderUsername = :uploaderUsername) " +
             "GROUP BY o.paymentMethod " +
-            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC")
+            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC",
+           countQuery = "SELECT COUNT(DISTINCT o.paymentMethod) " + // CONTEO EXPLÍCITO
+                        "FROM OrderItem oi " +
+                        "JOIN oi.order o " +
+                        "JOIN oi.product p " +
+                        "WHERE o.status = 'COMPLETED' " +
+                        "AND o.creadoEn >= :startDate " +
+                        "AND o.creadoEn <= :endDate " +
+                        "AND (:uploaderUsername IS NULL OR p.uploaderUsername = :uploaderUsername)")
     List<PaymentMethodStatsDto> getPaymentMethodStats(@Param("startDate") LocalDateTime startDate,
                                                       @Param("endDate") LocalDateTime endDate,
                                                       @Param("uploaderUsername") String uploaderUsername);
@@ -108,7 +130,7 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
     // Estadísticas específicas para colaborador (JPQL - OrderItem y Product)
     @Query("SELECT COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0) FROM OrderItem oi " +
             "JOIN oi.order o " +
-            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
+            "JOIN oi.product p " +
             "WHERE o.status = 'COMPLETED' " +
             "AND p.uploaderUsername = :uploaderUsername " +
             "AND o.creadoEn >= :startDate " +
@@ -119,7 +141,7 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT COUNT(DISTINCT o.id) FROM OrderItem oi " +
             "JOIN oi.order o " +
-            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
+            "JOIN oi.product p " +
             "WHERE o.status = 'COMPLETED' " +
             "AND p.uploaderUsername = :uploaderUsername " +
             "AND o.creadoEn >= :startDate " +
@@ -131,7 +153,7 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
     // Cantidad de productos distintos vendidos por colaborador (JPQL - OrderItem y Product)
     @Query("SELECT COUNT(DISTINCT oi.productId) FROM OrderItem oi " +
             "JOIN oi.order o " +
-            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
+            "JOIN oi.product p " +
             "WHERE o.status = 'COMPLETED' " +
             "AND p.uploaderUsername = :uploaderUsername " +
             "AND o.creadoEn >= :startDate " +
@@ -173,12 +195,16 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
     Long countTotalProducts();
 
     // Ventas mensuales para el gráfico de línea (JPQL - solo Order)
-    @Query("SELECT new com.aec.statssrv.dto.MonthlySalesDto(FUNCTION('MONTH', o.creadoEn), COALESCE(SUM(o.total), 0)) " +
+    @Query(value = "SELECT new com.aec.statssrv.dto.MonthlySalesDto(FUNCTION('MONTH', o.creadoEn), COALESCE(SUM(o.total), 0)) " +
             "FROM Order o " +
             "WHERE o.status = 'COMPLETED' " +
             "AND FUNCTION('YEAR', o.creadoEn) = :year " +
             "GROUP BY FUNCTION('MONTH', o.creadoEn) " +
-            "ORDER BY FUNCTION('MONTH', o.creadoEn)")
+            "ORDER BY FUNCTION('MONTH', o.creadoEn)",
+           countQuery = "SELECT COUNT(DISTINCT FUNCTION('MONTH', o.creadoEn)) " + // CONTEO EXPLÍCITO
+                        "FROM Order o " +
+                        "WHERE o.status = 'COMPLETED' " +
+                        "AND FUNCTION('YEAR', o.creadoEn) = :year")
     List<MonthlySalesDto> getMonthlySales(@Param("year") Integer year);
 
     // Obtener ingresos de un mes específico para el cálculo de crecimiento (JPQL - solo Order)
@@ -189,7 +215,7 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
     BigDecimal getMonthlyRevenue(@Param("year") Integer year, @Param("month") Integer month);
 
     // Top productos vendidos en los últimos 30 días (JPQL - OrderItem y Product)
-    @Query("SELECT new com.aec.statssrv.dto.ProductSalesDto(" +
+    @Query(value = "SELECT new com.aec.statssrv.dto.ProductSalesDto(" +
             "p.idProducto, " +
             "p.nombre, " +
             "p.uploaderUsername, " +
@@ -200,23 +226,37 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
             "p.pais) " +
             "FROM OrderItem oi " +
             "JOIN oi.order o " +
-            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
+            "JOIN oi.product p " +
             "WHERE o.status = 'COMPLETED' " +
             "AND o.creadoEn >= :startDate " +
             "AND o.creadoEn <= :endDate " +
             "GROUP BY p.idProducto, p.nombre, p.uploaderUsername, p.precioIndividual, p.pais " +
-            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC")
+            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC",
+           countQuery = "SELECT COUNT(DISTINCT p.idProducto) " + // CONTEO EXPLÍCITO
+                        "FROM OrderItem oi " +
+                        "JOIN oi.order o " +
+                        "JOIN oi.product p " +
+                        "WHERE o.status = 'COMPLETED' " +
+                        "AND o.creadoEn >= :startDate " +
+                        "AND o.creadoEn <= :endDate")
     List<ProductSalesDto> getTopProductsLast30Days(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     // Ventas mensuales por colaborador para el gráfico de línea (JPQL - OrderItem y Product)
-    @Query("SELECT new com.aec.statssrv.dto.MonthlySalesDto(FUNCTION('MONTH', o.creadoEn), COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0)) " +
+    @Query(value = "SELECT new com.aec.statssrv.dto.MonthlySalesDto(FUNCTION('MONTH', o.creadoEn), COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0)) " +
             "FROM OrderItem oi " +
             "JOIN oi.order o " +
-            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
+            "JOIN oi.product p " +
             "WHERE o.status = 'COMPLETED' " +
             "AND p.uploaderUsername = :uploaderUsername " +
             "AND FUNCTION('YEAR', o.creadoEn) = :year " +
             "GROUP BY FUNCTION('MONTH', o.creadoEn) " +
-            "ORDER BY FUNCTION('MONTH', o.creadoEn)")
+            "ORDER BY FUNCTION('MONTH', o.creadoEn)",
+           countQuery = "SELECT COUNT(DISTINCT FUNCTION('MONTH', o.creadoEn)) " + // CONTEO EXPLÍCITO
+                        "FROM OrderItem oi " +
+                        "JOIN oi.order o " +
+                        "JOIN oi.product p " +
+                        "WHERE o.status = 'COMPLETED' " +
+                        "AND p.uploaderUsername = :uploaderUsername " +
+                        "AND FUNCTION('YEAR', o.creadoEn) = :year")
     List<MonthlySalesDto> getMonthlySalesByCollaborator(@Param("uploaderUsername") String uploaderUsername, @Param("year") Integer year);
 }
