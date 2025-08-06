@@ -6,8 +6,10 @@ import com.aec.statssrv.dto.MonthlySalesDto;
 import com.aec.statssrv.dto.PaymentMethodStatsDto;
 import com.aec.statssrv.dto.ProductSalesDto;
 import com.aec.statssrv.model.Order;
-import com.aec.statssrv.model.Product;
-import com.aec.statssrv.model.OrderItem; 
+import com.aec.statssrv.model.Product; // Product SÍ está mapeado en este microservicio
+import com.aec.statssrv.model.OrderItem; // OrderItem SÍ está mapeado en este microservicio
+// User NO está mapeado, por lo que no se importa la entidad User aquí.
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -35,7 +37,7 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
     Long getTotalCompletedOrders(@Param("startDate") LocalDateTime startDate,
                                  @Param("endDate") LocalDateTime endDate);
 
-    // Cantidad de productos distintos vendidos (JPQL - OrderItem y Order)
+    // Cantidad de productos distintos vendidos (JPQL - solo OrderItem y Order)
     @Query("SELECT COUNT(DISTINCT oi.productId) FROM OrderItem oi " +
             "JOIN oi.order o " +
             "WHERE o.status = 'COMPLETED' " +
