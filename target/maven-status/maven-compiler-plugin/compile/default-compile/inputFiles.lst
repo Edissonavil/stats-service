@@ -2,6 +2,7 @@
 /home/tesis/productosaec/individual_services/stats-service/src/main/java/com/aec/statssrv/config/SecurityConfig.java
 /home/tesis/productosaec/individual_services/stats-service/src/main/java/com/aec/statssrv/controller/StatsController.java
 /home/tesis/productosaec/individual_services/stats-service/src/main/java/com/aec/statssrv/dto/CollaboratorSalesDto.java
+/home/tesis/productosaec/individual_services/stats-service/src/main/java/com/aec/statssrv/dto/MonthlySalesDto.java
 /home/tesis/productosaec/individual_services/stats-service/src/main/java/com/aec/statssrv/dto/PaymentMethodStatsDto.java
 /home/tesis/productosaec/individual_services/stats-service/src/main/java/com/aec/statssrv/dto/ProductSalesDto.java
 /home/tesis/productosaec/individual_services/stats-service/src/main/java/com/aec/statssrv/dto/SalesStatsDto.java

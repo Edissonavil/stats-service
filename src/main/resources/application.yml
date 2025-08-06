@@ -4,18 +4,6 @@ server:
 spring:
   application:
     name: stats-service
-  mail:
-    host: ${MAIL_HOST}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USER}
-    password: ${MAIL_PASS}
-    protocol: smtp
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
-      mail.smtp.ssl.enable: false
-      mail.smtp.ssl.trust: ${MAIL_HOST}
-    default-encoding: UTF-8
 
   datasource:
     url: jdbc:postgresql://${PGHOST:localhost}:${PGPORT:5432}/${PGDATABASE:railway}

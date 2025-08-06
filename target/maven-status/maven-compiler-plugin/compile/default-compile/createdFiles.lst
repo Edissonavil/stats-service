@@ -1,3 +1,4 @@
+com/aec/statssrv/dto/MonthlySalesDto.class
 com/aec/statssrv/controller/StatsController$HealthResponse.class
 com/aec/statssrv/dto/PaymentMethodStatsDto.class
 com/aec/statssrv/StatsServiceApplication.class

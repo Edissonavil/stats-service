@@ -9,16 +9,11 @@ public class MonthlySalesDto {
     private String month;
     private BigDecimal revenue;
 
-    // CONSTRUCTOR 1: para cuando Hibernate devuelve un Double
-    public MonthlySalesDto(Integer monthNumber, Double revenue) {
-        this.revenue = (revenue != null) ? BigDecimal.valueOf(revenue) : BigDecimal.ZERO;
-        this.month = Month.of(monthNumber).getDisplayName(TextStyle.SHORT, Locale.getDefault());
-    }
-
-    // CONSTRUCTOR 2: para cuando Hibernate devuelve un BigDecimal (más probable)
-    public MonthlySalesDto(Integer monthNumber, BigDecimal revenue) {
+    // === Nuevo constructor para JPQL ===
+    public MonthlySalesDto(int monthNumber, BigDecimal revenue) {
+        this.month = Month.of(monthNumber)
+                .getDisplayName(TextStyle.SHORT, Locale.getDefault());
         this.revenue = (revenue != null) ? revenue : BigDecimal.ZERO;
-        this.month = Month.of(monthNumber).getDisplayName(TextStyle.SHORT, Locale.getDefault());
     }
 
     // Constructor para SQL nativo (sin cambios)
@@ -28,8 +23,19 @@ public class MonthlySalesDto {
     }
 
     // Getters y Setters
-    public String getMonth() { return month; }
-    public void setMonth(String month) { this.month = month; }
-    public BigDecimal getRevenue() { return revenue; }
-    public void setRevenue(BigDecimal revenue) { this.revenue = revenue; }
+    public String getMonth() {
+        return month;
+    }
+
+    public void setMonth(String month) {
+        this.month = month;
+    }
+
+    public BigDecimal getRevenue() {
+        return revenue;
+    }
+
+    public void setRevenue(BigDecimal revenue) {
+        this.revenue = revenue;
+    }
 }
