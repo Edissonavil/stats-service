@@ -14,6 +14,8 @@ public class MonthlySalesDto {
                             .getDisplayName(TextStyle.SHORT, Locale.getDefault());
         this.revenue = (revenue != null) ? revenue : BigDecimal.ZERO;
     }
+
+
     // Getters y Setters
     public String getMonth() {
         return month;

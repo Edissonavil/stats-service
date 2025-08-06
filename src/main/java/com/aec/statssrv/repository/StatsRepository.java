@@ -246,23 +246,20 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
 
        // Ventas mensuales por colaborador para el gráfico de línea (JPQL - OrderItem y
        // Product)
-       @Query(value = "SELECT new com.aec.statssrv.dto.MonthlySalesDto(FUNCTION('MONTH', o.creadoEn), COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0)) "
-                     +
-                     "FROM OrderItem oi " +
-                     "JOIN oi.order o " +
-                     "JOIN oi.product p " +
-                     "WHERE o.status = 'COMPLETED' " +
-                     "AND p.uploaderUsername = :uploaderUsername " +
-                     "AND FUNCTION('YEAR', o.creadoEn) = :year " +
-                     "GROUP BY FUNCTION('MONTH', o.creadoEn) " +
-                     "ORDER BY FUNCTION('MONTH', o.creadoEn)", countQuery = "SELECT COUNT(DISTINCT FUNCTION('MONTH', o.creadoEn)) "
-                                   + // CONTEO EXPLÍCITO
-                                   "FROM OrderItem oi " +
-                                   "JOIN oi.order o " +
-                                   "JOIN oi.product p " +
-                                   "WHERE o.status = 'COMPLETED' " +
-                                   "AND p.uploaderUsername = :uploaderUsername " +
-                                   "AND FUNCTION('YEAR', o.creadoEn) = :year")
+       @Query("""
+                     SELECT new com.aec.statssrv.dto.MonthlySalesDto(
+                       MONTH(o.creadoEn),
+                       SUM(oi.precioUnitario * oi.cantidad)
+                     )
+                     FROM OrderItem oi
+                     JOIN oi.order o
+                     JOIN oi.product p
+                     WHERE o.status = 'COMPLETED'
+                       AND p.uploaderUsername = :uploaderUsername
+                       AND YEAR(o.creadoEn) = :year
+                     GROUP BY MONTH(o.creadoEn)
+                     ORDER BY MONTH(o.creadoEn)
+                     """)
        List<MonthlySalesDto> getMonthlySalesByCollaborator(@Param("uploaderUsername") String uploaderUsername,
                      @Param("year") Integer year);
 }
