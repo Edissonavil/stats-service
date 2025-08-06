@@ -6,7 +6,8 @@ import com.aec.statssrv.dto.MonthlySalesDto;
 import com.aec.statssrv.dto.PaymentMethodStatsDto;
 import com.aec.statssrv.dto.ProductSalesDto;
 import com.aec.statssrv.model.Order;
-
+import com.aec.statssrv.model.Product;
+import com.aec.statssrv.model.OrderItem; 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -34,8 +35,8 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
     Long getTotalCompletedOrders(@Param("startDate") LocalDateTime startDate,
                                  @Param("endDate") LocalDateTime endDate);
 
-    // Contar productos (unidades) vendidas (JPQL - solo OrderItem y Order)
-    @Query("SELECT COUNT(DISTINCT oi.productId) FROM OrderItem oi " + // Mantengo COUNT(DISTINCT oi.productId) según tu código original
+    // Cantidad de productos distintos vendidos (JPQL - OrderItem y Order)
+    @Query("SELECT COUNT(DISTINCT oi.productId) FROM OrderItem oi " +
             "JOIN oi.order o " +
             "WHERE o.status = 'COMPLETED' " +
             "AND o.creadoEn >= :startDate " +
@@ -43,138 +44,130 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
     Long getTotalProductsSold(@Param("startDate") LocalDateTime startDate,
                               @Param("endDate") LocalDateTime endDate);
 
-    // Ventas por colaborador (SQL Nativo - usa tabla 'products' para uploader_username y pais)
-    @Query(value = "SELECT " +
-            "p.uploader_username AS uploaderUsername, " +
-            "COALESCE(SUM(oi.precio_unitario * oi.cantidad), 0) AS totalSales, " +
-            "COALESCE(SUM(oi.cantidad), 0) AS totalQuantity, " +
-            "COUNT(DISTINCT o.id) AS ordersCount, " +
-            "p.pais AS country " +
-            "FROM order_items oi " +
-            "JOIN orders o ON oi.order_id = o.id " +
-            "JOIN products p ON oi.product_id = p.id_producto " + // Unir con la tabla products
+    // Ventas por colaborador (JPQL - OrderItem y Product)
+    @Query("SELECT new com.aec.statssrv.dto.CollaboratorSalesDto(" +
+            "p.uploaderUsername, " +
+            "COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0), " +
+            "COALESCE(SUM(oi.cantidad), 0), " +
+            "COUNT(DISTINCT o.id), " +
+            "p.pais) " +
+            "FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
             "WHERE o.status = 'COMPLETED' " +
-            "AND o.creado_en >= :startDate " +
-            "AND o.creado_en <= :endDate " +
-            "GROUP BY p.uploader_username, p.pais " +
-            "ORDER BY totalSales DESC",
-            nativeQuery = true)
+            "AND o.creadoEn >= :startDate " +
+            "AND o.creadoEn <= :endDate " +
+            "GROUP BY p.uploaderUsername, p.pais " +
+            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC")
     List<CollaboratorSalesDto> getCollaboratorSales(@Param("startDate") LocalDateTime startDate,
                                                     @Param("endDate") LocalDateTime endDate);
 
-    // Ventas por producto (SQL Nativo - usa tabla 'products')
-    @Query(value = "SELECT " +
-            "p.id_producto AS idProducto, " +
-            "p.nombre AS productName, " +
-            "p.uploader_username AS uploaderUsername, " +
-            "COALESCE(SUM(oi.precio_unitario * oi.cantidad), 0) AS totalSales, " +
-            "COALESCE(SUM(oi.cantidad), 0) AS totalQuantity, " +
-            "COUNT(DISTINCT o.id) AS ordersCount, " +
-            "p.precio_individual AS unitPrice, " +
-            "p.pais AS country " +
-            "FROM order_items oi " +
-            "JOIN orders o ON oi.order_id = o.id " +
-            "JOIN products p ON oi.product_id = p.id_producto " + // Unir con la tabla products
+    // Ventas por producto (JPQL - OrderItem y Product)
+    @Query("SELECT new com.aec.statssrv.dto.ProductSalesDto(" +
+            "p.idProducto, " +
+            "p.nombre, " +
+            "p.uploaderUsername, " +
+            "COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0), " +
+            "COALESCE(SUM(oi.cantidad), 0), " +
+            "COUNT(DISTINCT o.id), " +
+            "p.precioIndividual, " +
+            "p.pais) " +
+            "FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
             "WHERE o.status = 'COMPLETED' " +
-            "AND o.creado_en >= :startDate " +
-            "AND o.creado_en <= :endDate " +
-            "AND (:uploaderUsername IS NULL OR p.uploader_username = :uploaderUsername) " + // Usar uploader_username de products
-            "GROUP BY p.id_producto, p.nombre, p.uploader_username, p.precio_individual, p.pais " +
-            "ORDER BY totalSales DESC",
-            nativeQuery = true)
+            "AND o.creadoEn >= :startDate " +
+            "AND o.creadoEn <= :endDate " +
+            "AND (:uploaderUsername IS NULL OR p.uploaderUsername = :uploaderUsername) " +
+            "GROUP BY p.idProducto, p.nombre, p.uploaderUsername, p.precioIndividual, p.pais " +
+            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC")
     List<ProductSalesDto> getProductSales(@Param("startDate") LocalDateTime startDate,
                                           @Param("endDate") LocalDateTime endDate,
                                           @Param("uploaderUsername") String uploaderUsername);
 
-    // Estadísticas por método de pago (SQL Nativo - usa tabla 'products' para filtrar por uploader_username)
-    @Query(value = "SELECT " +
-            "COALESCE(o.payment_method, 'NO_ESPECIFICADO') AS paymentMethod, " +
-            "COALESCE(SUM(oi.precio_unitario * oi.cantidad), 0) AS totalAmount, " +
-            "COUNT(DISTINCT o.id) AS ordersCount " +
-            "FROM order_items oi " +
-            "JOIN orders o ON oi.order_id = o.id " +
-            "LEFT JOIN products p ON oi.product_id = p.id_producto " + // LEFT JOIN para que no se filtren si product_id es nulo
+    // Estadísticas por método de pago (JPQL - OrderItem y Product)
+    @Query("SELECT new com.aec.statssrv.dto.PaymentMethodStatsDto(" +
+            "COALESCE(o.paymentMethod, 'NO_ESPECIFICADO'), " +
+            "COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0), " +
+            "COUNT(DISTINCT o.id)) " +
+            "FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
             "WHERE o.status = 'COMPLETED' " +
-            "AND o.creado_en >= :startDate " +
-            "AND o.creado_en <= :endDate " +
-            "AND (:uploaderUsername IS NULL OR p.uploader_username = :uploaderUsername) " + // Usar uploader_username de products
-            "GROUP BY o.payment_method " +
-            "ORDER BY totalAmount DESC",
-            nativeQuery = true)
+            "AND o.creadoEn >= :startDate " +
+            "AND o.creadoEn <= :endDate " +
+            "AND (:uploaderUsername IS NULL OR p.uploaderUsername = :uploaderUsername) " +
+            "GROUP BY o.paymentMethod " +
+            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC")
     List<PaymentMethodStatsDto> getPaymentMethodStats(@Param("startDate") LocalDateTime startDate,
                                                       @Param("endDate") LocalDateTime endDate,
                                                       @Param("uploaderUsername") String uploaderUsername);
 
-    // Estadísticas específicas para colaborador (SQL Nativo - usa tabla 'products')
-    @Query(value = "SELECT COALESCE(SUM(oi.precio_unitario * oi.cantidad), 0) FROM order_items oi " +
-            "JOIN orders o ON oi.order_id = o.id " +
-            "JOIN products p ON oi.product_id = p.id_producto " + // Unir con la tabla products
+    // Estadísticas específicas para colaborador (JPQL - OrderItem y Product)
+    @Query("SELECT COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0) FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
             "WHERE o.status = 'COMPLETED' " +
-            "AND p.uploader_username = :uploaderUsername " + // Usar uploader_username de products
-            "AND o.creado_en >= :startDate " +
-            "AND o.creado_en <= :endDate",
-            nativeQuery = true)
+            "AND p.uploaderUsername = :uploaderUsername " +
+            "AND o.creadoEn >= :startDate " +
+            "AND o.creadoEn <= :endDate")
     BigDecimal getCollaboratorTotalRevenue(@Param("uploaderUsername") String uploaderUsername,
                                            @Param("startDate") LocalDateTime startDate,
                                            @Param("endDate") LocalDateTime endDate);
 
-    @Query(value = "SELECT COUNT(DISTINCT o.id) FROM order_items oi " +
-            "JOIN orders o ON oi.order_id = o.id " +
-            "JOIN products p ON oi.product_id = p.id_producto " + // Unir con la tabla products
+    @Query("SELECT COUNT(DISTINCT o.id) FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
             "WHERE o.status = 'COMPLETED' " +
-            "AND p.uploader_username = :uploaderUsername " + // Usar uploader_username de products
-            "AND o.creado_en >= :startDate " +
-            "AND o.creado_en <= :endDate",
-            nativeQuery = true)
+            "AND p.uploaderUsername = :uploaderUsername " +
+            "AND o.creadoEn >= :startDate " +
+            "AND o.creadoEn <= :endDate")
     Long getCollaboratorTotalOrders(@Param("uploaderUsername") String uploaderUsername,
                                     @Param("startDate") LocalDateTime startDate,
                                     @Param("endDate") LocalDateTime endDate);
 
-    // Contar productos (unidades) vendidas por colaborador (SQL Nativo - usa tabla 'products')
-    @Query(value = "SELECT COUNT(DISTINCT oi.product_id) FROM order_items oi " + // Mantengo COUNT(DISTINCT oi.product_id)
-            "JOIN orders o ON oi.order_id = o.id " +
-            "JOIN products p ON oi.product_id = p.id_producto " + // Unir con la tabla products
+    // Cantidad de productos distintos vendidos por colaborador (JPQL - OrderItem y Product)
+    @Query("SELECT COUNT(DISTINCT oi.productId) FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
             "WHERE o.status = 'COMPLETED' " +
-            "AND p.uploader_username = :uploaderUsername " + // Usar uploader_username de products
-            "AND o.creado_en >= :startDate " +
-            "AND o.creado_en <= :endDate",
-            nativeQuery = true)
+            "AND p.uploaderUsername = :uploaderUsername " +
+            "AND o.creadoEn >= :startDate " +
+            "AND o.creadoEn <= :endDate")
     Long getCollaboratorTotalProductsSold(@Param("uploaderUsername") String uploaderUsername,
                                          @Param("startDate") LocalDateTime startDate,
                                          @Param("endDate") LocalDateTime endDate);
 
-    // Verificar si el colaborador existe (SQL Nativo - usa tabla 'users')
+    // Verificar si el colaborador existe (SQL Nativo - usa tabla 'users' directamente)
     @Query(value = "SELECT COUNT(u.id) > 0 FROM users u WHERE u.nombre_usuario = :username AND u.rol = 'ROL_COLABORADOR'",
             nativeQuery = true)
     boolean existsCollaboratorByUsername(@Param("username") String username);
 
     // --- Nuevas Consultas para el Panel de Administrador ---
 
-    // Total de colaboradores (SQL Nativo - usa tabla 'users')
+    // Total de colaboradores (SQL Nativo - usa tabla 'users' directamente)
     @Query(value = "SELECT COUNT(u.id) FROM users u WHERE u.rol = 'ROL_COLABORADOR'",
             nativeQuery = true)
     Long countTotalCollaborators();
 
-    // Total de clientes (JPQL - solo Order)
-    @Query("SELECT COUNT(DISTINCT o.clienteUsername) FROM Order o WHERE o.status = 'COMPLETED'") // Usar clienteUsername de Order
+    // Total de clientes (JPQL - solo Order, usando clienteUsername)
+    @Query("SELECT COUNT(DISTINCT o.clienteUsername) FROM Order o WHERE o.status = 'COMPLETED'")
     Long countTotalCustomers();
 
-    // Productos pendientes de revisión (SQL Nativo - usa tabla 'products')
-    @Query(value = "SELECT COUNT(p.id_producto) FROM products p WHERE p.estado = 'PENDIENTE'", // Usar p.estado
-            nativeQuery = true)
+    // Productos pendientes de revisión (JPQL - Product)
+    @Query("SELECT COUNT(p.idProducto) FROM Product p WHERE p.estado = 'PENDIENTE'")
     Integer countProductsPendingReview();
 
-    // Pagos pendientes de verificación (JPQL - solo Order)
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.paymentStatus = 'UPLOADED_RECEIPT'") // Usar valor de enum
+    // Pagos pendientes de verificación (JPQL - Order)
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.paymentStatus = 'UPLOADED_RECEIPT'")
     Integer countPaymentsToVerify();
 
-    // Errores en comprobantes de pago (JPQL - solo Order)
-    @Query("SELECT COUNT(o) FROM Order o WHERE o.paymentStatus = 'PAYMENT_REJECTED'") // Usar valor de enum
+    // Errores en comprobantes de pago (JPQL - Order)
+    @Query("SELECT COUNT(o) FROM Order o WHERE o.paymentStatus = 'PAYMENT_REJECTED'")
     Integer countPaymentErrors();
 
-    // Total de productos registrados en el sistema (SQL Nativo - usa tabla 'products')
-    @Query(value = "SELECT COUNT(p.id_producto) FROM products p",
-            nativeQuery = true)
+    // Total de productos registrados en el sistema (JPQL - Product)
+    @Query("SELECT COUNT(p.idProducto) FROM Product p")
     Long countTotalProducts();
 
     // Ventas mensuales para el gráfico de línea (JPQL - solo Order)
@@ -193,39 +186,35 @@ public interface StatsRepository extends JpaRepository<Order, Long> {
             "AND FUNCTION('MONTH', o.creadoEn) = :month")
     BigDecimal getMonthlyRevenue(@Param("year") Integer year, @Param("month") Integer month);
 
-    // Top productos vendidos en los últimos 30 días (SQL Nativo - usa tabla 'products')
-    @Query(value = "SELECT " +
-            "p.id_producto AS idProducto, " +
-            "p.nombre AS productName, " +
-            "p.uploader_username AS uploaderUsername, " +
-            "COALESCE(SUM(oi.precio_unitario * oi.cantidad), 0) AS totalSales, " +
-            "COALESCE(SUM(oi.cantidad), 0) AS totalQuantity, " +
-            "COUNT(DISTINCT o.id) AS ordersCount, " +
-            "p.precio_individual AS unitPrice, " +
-            "p.pais AS country " +
-            "FROM order_items oi " +
-            "JOIN orders o ON oi.order_id = o.id " +
-            "JOIN products p ON oi.product_id = p.id_producto " + // Unir con la tabla products
+    // Top productos vendidos en los últimos 30 días (JPQL - OrderItem y Product)
+    @Query("SELECT new com.aec.statssrv.dto.ProductSalesDto(" +
+            "p.idProducto, " +
+            "p.nombre, " +
+            "p.uploaderUsername, " +
+            "COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0), " +
+            "COALESCE(SUM(oi.cantidad), 0), " +
+            "COUNT(DISTINCT o.id), " +
+            "p.precioIndividual, " +
+            "p.pais) " +
+            "FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
             "WHERE o.status = 'COMPLETED' " +
-            "AND o.creado_en >= :startDate " +
-            "AND o.creado_en <= :endDate " +
-            "GROUP BY p.id_producto, p.nombre, p.uploader_username, p.precio_individual, p.pais " +
-            "ORDER BY totalSales DESC",
-            nativeQuery = true)
+            "AND o.creadoEn >= :startDate " +
+            "AND o.creadoEn <= :endDate " +
+            "GROUP BY p.idProducto, p.nombre, p.uploaderUsername, p.precioIndividual, p.pais " +
+            "ORDER BY SUM(oi.precioUnitario * oi.cantidad) DESC")
     List<ProductSalesDto> getTopProductsLast30Days(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    // Ventas mensuales por colaborador para el gráfico de línea (SQL Nativo - usa tabla 'products')
-    @Query(value = "SELECT " +
-            "FUNCTION('MONTH', o.creado_en) AS month, " + // Usar nombre de columna de DB
-            "COALESCE(SUM(oi.precio_unitario * oi.cantidad), 0) AS revenue " +
-            "FROM order_items oi " +
-            "JOIN orders o ON oi.order_id = o.id " +
-            "JOIN products p ON oi.product_id = p.id_producto " + // Unir con la tabla products
+    // Ventas mensuales por colaborador para el gráfico de línea (JPQL - OrderItem y Product)
+    @Query("SELECT new com.aec.statssrv.dto.MonthlySalesDto(FUNCTION('MONTH', o.creadoEn), COALESCE(SUM(oi.precioUnitario * oi.cantidad), 0)) " +
+            "FROM OrderItem oi " +
+            "JOIN oi.order o " +
+            "JOIN oi.product p " + // Product está mapeado, por lo que podemos hacer JOIN
             "WHERE o.status = 'COMPLETED' " +
-            "AND p.uploader_username = :uploaderUsername " + // Usar uploader_username de products
-            "AND FUNCTION('YEAR', o.creado_en) = :year " + // Usar nombre de columna de DB
-            "GROUP BY FUNCTION('MONTH', o.creado_en) " +
-            "ORDER BY FUNCTION('MONTH', o.creado_en)",
-            nativeQuery = true)
+            "AND p.uploaderUsername = :uploaderUsername " +
+            "AND FUNCTION('YEAR', o.creadoEn) = :year " +
+            "GROUP BY FUNCTION('MONTH', o.creadoEn) " +
+            "ORDER BY FUNCTION('MONTH', o.creadoEn)")
     List<MonthlySalesDto> getMonthlySalesByCollaborator(@Param("uploaderUsername") String uploaderUsername, @Param("year") Integer year);
 }
