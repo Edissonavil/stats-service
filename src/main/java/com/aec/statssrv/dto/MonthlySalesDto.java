@@ -1,30 +1,28 @@
 package com.aec.statssrv.dto;
 
 import java.math.BigDecimal;
-import java.time.Month;
-import java.time.format.TextStyle;
-import java.util.Locale;
 
 public class MonthlySalesDto {
     private String month;
     private BigDecimal revenue;
 
-    /** Constructor para JPQL: recibe int + BigDecimal */
-    public MonthlySalesDto(int monthNumber, BigDecimal revenue) {
-        this.month   = Month.of(monthNumber)
-                            .getDisplayName(TextStyle.SHORT, Locale.getDefault());
+    // Nuevo constructor que coincide con los tipos devueltos por la consulta
+    public MonthlySalesDto(Integer monthNumber, BigDecimal revenue) {
+        // Convierte el número del mes a su nombre corto
+        this.month = java.time.Month.of(monthNumber)
+                .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault());
         this.revenue = revenue;
     }
 
-    /** (Opcional) Otra firma si la usas en SQL nativo */
+    // Constructor para el alias 'month' en SQL nativo (si aún lo necesitas)
     public MonthlySalesDto(String month, BigDecimal revenue) {
-        this.month   = month;
+        this.month = month;
         this.revenue = revenue;
     }
 
-    // getters / setters…
-    public String getMonth()     { return month;   }
-    public BigDecimal getRevenue(){ return revenue; }
-    public void setMonth(String month)         { this.month = month;     }
-    public void setRevenue(BigDecimal revenue){ this.revenue = revenue; }
+    // Getters y Setters (sin cambios)
+    public String getMonth() { return month; }
+    public void setMonth(String month) { this.month = month; }
+    public BigDecimal getRevenue() { return revenue; }
+    public void setRevenue(BigDecimal revenue) { this.revenue = revenue; }
 }
