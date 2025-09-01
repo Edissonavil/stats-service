@@ -36,7 +36,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
 
-        cfg.setAllowedOrigins(List.of("https://gateway-production-129e.up.railway.app","https://aecf-production.up.railway.app", "https://aecblock.com"));
+        cfg.setAllowedOrigins(List.of("https://gateway-production-129e.up.railway.app", "https://aecblock.com"));
         cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true);
@@ -54,10 +54,7 @@ public class SecurityConfig {
         http
           .csrf(csrf -> csrf.disable())
           .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-          .authorizeHttpRequests(auth -> auth
-              // Permite acceso sin autenticación a Swagger UI y health check
-              .requestMatchers("/api/stats/health", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
-              
+          .authorizeHttpRequests(auth -> auth              
               // Define las reglas de autorización basadas en roles/autoridades
               .requestMatchers("/api/stats/admin/**").hasAuthority("ROL_ADMIN") 
               // Mantener hasAnyAuthority para colaborador, ya es correcto

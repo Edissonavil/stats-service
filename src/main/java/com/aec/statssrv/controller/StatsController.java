@@ -140,23 +140,5 @@ public class StatsController {
         return ResponseEntity.ok(stats);
     }
     
-    @GetMapping("/health")
-    @Operation(summary = "Health check del servicio")
-    public ResponseEntity<HealthResponse> healthCheck() {
-        return ResponseEntity.ok(new HealthResponse("Stats Service is running", "OK"));
-    }
-    
-    private static class HealthResponse {
-        private String message;
-        private String status;
-        
-        public HealthResponse(String message, String status) {
-            this.message = message;
-            this.status = status;
-        }
-        
-        public String getMessage() { return message; }
-        public String getStatus() { return status; }
-    }
 }
 
